@@ -12,6 +12,8 @@ import {
   Cloud,
   CloudOff,
   Clock3,
+  Eye,
+  EyeOff,
   FilePenLine,
   Gauge,
   LayoutDashboard,
@@ -923,6 +925,7 @@ function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -995,7 +998,15 @@ function AuthScreen() {
                 <span className="label">Palavra-passe</span>
                 <div className="relative">
                   <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8b9490]" size={17} />
-                  <input name="password" type="password" minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} className={`${inputClass} pl-10`} required />
+                  <input name="password" type={showPassword ? "text" : "password"} minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} className={`${inputClass} pl-10 pr-11`} required />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-[8px] text-[#7b8682] hover:bg-[#eef0eb] hover:text-[#26332f]"
+                    aria-label={showPassword ? "Ocultar palavra-passe" : "Mostrar palavra-passe"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </label>
             )}
@@ -1041,8 +1052,8 @@ function AuthScreen() {
 
 function ResetPasswordScreen({ onComplete }: { onComplete: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [complete, setComplete] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1063,7 +1074,10 @@ function ResetPasswordScreen({ onComplete }: { onComplete: () => void }) {
     if (updateError) {
       setError(updateError.message);
     } else {
-      setComplete(true);
+      clearStudyData();
+      await supabase.auth.signOut();
+      window.history.replaceState({}, "", window.location.pathname);
+      onComplete();
     }
     setBusy(false);
   };
@@ -1077,25 +1091,28 @@ function ResetPasswordScreen({ onComplete }: { onComplete: () => void }) {
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.035em]">Criar nova palavra-passe</h1>
           <p className="mt-2 text-sm leading-6 text-[#68736f]">Escolhe uma palavra-passe com pelo menos 6 caracteres.</p>
 
-          {complete ? (
-            <div className="mt-6">
-              <p className="rounded-[10px] bg-[#e5f4ed] px-3 py-3 text-sm font-semibold text-[#277454]">A palavra-passe foi alterada com sucesso.</p>
-              <button type="button" onClick={onComplete} className={`${primaryButton} mt-4 w-full`}>Continuar para a aplicação</button>
-            </div>
-          ) : (
-            <form onSubmit={submit} className="mt-6 space-y-4">
-              <label className="block">
-                <span className="label">Nova palavra-passe</span>
-                <input name="password" type="password" minLength={6} autoComplete="new-password" className={inputClass} required />
-              </label>
-              <label className="block">
-                <span className="label">Repetir palavra-passe</span>
-                <input name="confirmation" type="password" minLength={6} autoComplete="new-password" className={inputClass} required />
-              </label>
-              {error && <p className="flex items-center gap-2 text-sm font-semibold text-[#b94b45]"><AlertTriangle size={16} />{error}</p>}
-              <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>{busy ? "A guardar…" : "Guardar nova palavra-passe"}</button>
-            </form>
-          )}
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <label className="block">
+              <span className="label">Nova palavra-passe</span>
+              <div className="relative">
+                <input name="password" type={showPassword ? "text" : "password"} minLength={6} autoComplete="new-password" className={`${inputClass} pr-11`} required />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-[8px] text-[#7b8682] hover:bg-[#eef0eb] hover:text-[#26332f]"
+                  aria-label={showPassword ? "Ocultar palavras-passe" : "Mostrar palavras-passe"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </label>
+            <label className="block">
+              <span className="label">Repetir palavra-passe</span>
+              <input name="confirmation" type={showPassword ? "text" : "password"} minLength={6} autoComplete="new-password" className={inputClass} required />
+            </label>
+            {error && <p className="flex items-center gap-2 text-sm font-semibold text-[#b94b45]"><AlertTriangle size={16} />{error}</p>}
+            <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>{busy ? "A guardar…" : "Guardar nova palavra-passe"}</button>
+          </form>
         </div>
       </div>
     </div>
@@ -1227,7 +1244,15 @@ export function StudyApp() {
   };
 
   if (initialising) return <LoadingScreen />;
-  if (recoveringPassword) return <ResetPasswordScreen onComplete={() => setRecoveringPassword(false)} />;
+  if (recoveringPassword) return (
+    <ResetPasswordScreen
+      onComplete={() => {
+        setRecoveringPassword(false);
+        setSession(null);
+        setData(null);
+      }}
+    />
+  );
   if (!session) return <AuthScreen />;
   if (!data) return <LoadingScreen />;
 
