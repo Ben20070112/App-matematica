@@ -25,15 +25,25 @@ export const exerciseTopics: ExerciseTopic[] = [
   { id: "complex", name: "Números complexos", description: "Operações, formas algébrica e trigonométrica." },
 ];
 
-const pdf = {
-  firstDerivative: "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/1derivada.pdf",
-  secondDerivative: "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/2derivada.pdf",
+export const exercisePdfSources: Record<string, string> = {
+  "first-derivative": "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/1derivada.pdf",
+  "second-derivative": "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/2derivada.pdf",
   limits: "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/limites_continuidade.pdf",
-  expLog: "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/exponenciais_logaritmos.pdf",
+  "exp-log": "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/exponenciais_logaritmos.pdf",
   trigonometry: "https://mat.absolutamente.net/compilacoes/mat-a/12/funcoes/func_trigonometricas.pdf",
   probability: "https://mat.absolutamente.net/compilacoes/mat-a/12/probabilidades/probabilidade.pdf",
   complex: "https://mat.absolutamente.net/compilacoes/mat-a/12/complexos/operac_simplific.pdf",
 } as const;
+
+const pdf = {
+  firstDerivative: exercisePdfSources["first-derivative"],
+  secondDerivative: exercisePdfSources["second-derivative"],
+  limits: exercisePdfSources.limits,
+  expLog: exercisePdfSources["exp-log"],
+  trigonometry: exercisePdfSources.trigonometry,
+  probability: exercisePdfSources.probability,
+  complex: exercisePdfSources.complex,
+};
 
 const makeExercise = (
   topicId: string,
@@ -55,8 +65,8 @@ const makeExercise = (
 });
 
 export const exerciseBank: ExamExercise[] = [
-  makeExercise("first-derivative", "Primeira derivada", "1", "Exame 2026 · 1.ª Fase", pdf.firstDerivative, 1),
-  makeExercise("first-derivative", "Primeira derivada", "2", "Exame 2025 · Época especial", pdf.firstDerivative, 1),
+  makeExercise("first-derivative", "Primeira derivada", "1", "Exame 2026 · 1.ª Fase", exercisePdfSources["first-derivative"], 1),
+  makeExercise("first-derivative", "Primeira derivada", "2", "Exame 2025 · Época especial", exercisePdfSources["first-derivative"], 1),
   makeExercise("first-derivative", "Primeira derivada", "3", "Exame 2025 · 2.ª Fase", pdf.firstDerivative, 2),
   makeExercise("first-derivative", "Primeira derivada", "4", "Exame 2024 · 1.ª Fase", pdf.firstDerivative, 2),
   makeExercise("first-derivative", "Primeira derivada", "5", "Exame 2024 · 2.ª Fase (adaptado)", pdf.firstDerivative, 2),
