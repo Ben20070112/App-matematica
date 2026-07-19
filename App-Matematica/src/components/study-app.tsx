@@ -9,11 +9,16 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDot,
+  Cloud,
+  CloudOff,
   Clock3,
   FilePenLine,
   Gauge,
   LayoutDashboard,
   ListChecks,
+  LockKeyhole,
+  LogOut,
+  Mail,
   Menu,
   Pause,
   Play,
@@ -26,10 +31,12 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { createId, loadStudyData, saveStudyData, todayKey } from "@/lib/storage";
+import { clearStudyData, createId, loadStudyData, saveStudyData, todayKey } from "@/lib/storage";
+import { loadCloudStudyData, saveCloudStudyData, supabase } from "@/lib/supabase";
 import type {
   ErrorNote,
   ExerciseLog,
@@ -911,6 +918,108 @@ function MocksView({ data, updateData }: { data: StudyData; updateData: (updater
   );
 }
 
+function AuthScreen() {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    const values = new FormData(event.currentTarget);
+    const email = values.get("email")?.toString().trim() ?? "";
+    const password = values.get("password")?.toString() ?? "";
+
+    const result = mode === "login"
+      ? await supabase.auth.signInWithPassword({ email, password })
+      : await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+
+    if (result.error) {
+      setError(result.error.message);
+    } else if (mode === "signup" && !result.data.session) {
+      setMessage("Enviámos um email de confirmação. Abre-o e depois inicia sessão.");
+    }
+
+    setBusy(false);
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#f6f5ef] px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="mb-7 flex justify-center"><Brand /></div>
+        <div className="card rounded-[18px] p-6 sm:p-8">
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#de6b48]">Sincronização</p>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.035em]">
+            {mode === "login" ? "Entra na tua conta" : "Cria a tua conta"}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#68736f]">
+            Usa a mesma conta no computador e no telemóvel para manter todo o progresso sincronizado.
+          </p>
+
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <label className="block">
+              <span className="label">Email</span>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8b9490]" size={17} />
+                <input name="email" type="email" autoComplete="email" className={`${inputClass} pl-10`} required />
+              </div>
+            </label>
+            <label className="block">
+              <span className="label">Palavra-passe</span>
+              <div className="relative">
+                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8b9490]" size={17} />
+                <input name="password" type="password" minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} className={`${inputClass} pl-10`} required />
+              </div>
+            </label>
+
+            {error && <p className="flex items-center gap-2 text-sm font-semibold text-[#b94b45]"><AlertTriangle size={16} />{error}</p>}
+            {message && <p className="rounded-[10px] bg-[#e5f4ed] px-3 py-2.5 text-sm font-semibold text-[#277454]">{message}</p>}
+
+            <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>
+              {busy ? "A ligar…" : mode === "login" ? "Iniciar sessão" : "Criar conta"}
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode((current) => current === "login" ? "signup" : "login");
+              setError("");
+              setMessage("");
+            }}
+            className="mt-5 w-full text-center text-sm font-bold text-[#356f5b] hover:text-[#153f36]"
+          >
+            {mode === "login" ? "Ainda não tens conta? Criar conta" : "Já tens conta? Iniciar sessão"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SyncStatus({ session, synced, onSignOut }: { session: Session; synced: boolean; onSignOut: () => void }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-center justify-end gap-2 text-xs text-[#68736f]">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#dfe3de] bg-white px-3 py-1.5 font-semibold">
+        {synced ? <Cloud size={14} className="text-[#3a8465]" /> : <CloudOff size={14} className="text-[#c79531]" />}
+        {synced ? "Sincronizado" : "A sincronizar…"}
+      </span>
+      <span className="max-w-[220px] truncate rounded-full border border-[#dfe3de] bg-white px-3 py-1.5 font-semibold">{session.user.email}</span>
+      <button type="button" onClick={onSignOut} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-bold hover:bg-[#eceee9] hover:text-[#26332f]">
+        <LogOut size={14} />Sair
+      </button>
+    </div>
+  );
+}
+
 function LoadingScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#f6f5ef]">
@@ -924,20 +1033,93 @@ function LoadingScreen() {
 
 export function StudyApp() {
   const [data, setData] = useState<StudyData | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [initialising, setInitialising] = useState(true);
+  const [synced, setSynced] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
 
   useEffect(() => {
-    const hydration = window.setTimeout(() => setData(loadStudyData()), 0);
-    return () => window.clearTimeout(hydration);
+    let active = true;
+
+    const hydrate = async (nextSession: Session | null) => {
+      if (!active) return;
+      setSession(nextSession);
+
+      if (!nextSession) {
+        setData(null);
+        setInitialising(false);
+        return;
+      }
+
+      setInitialising(true);
+      const localData = loadStudyData();
+
+      try {
+        const cloudData = await loadCloudStudyData(nextSession.user.id);
+        const loadedData = cloudData ?? localData;
+        saveStudyData(loadedData);
+        if (!cloudData) await saveCloudStudyData(nextSession.user.id, loadedData);
+        if (active) {
+          setData(loadedData);
+          setSynced(true);
+        }
+      } catch {
+        if (active) {
+          setData(localData);
+          setSynced(false);
+        }
+      } finally {
+        if (active) setInitialising(false);
+      }
+    };
+
+    void supabase.auth.getSession().then(({ data: authData }) => hydrate(authData.session));
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      window.setTimeout(() => void hydrate(nextSession), 0);
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    if (data) saveStudyData(data);
-  }, [data]);
+    if (!session) return;
 
-  const updateData = useMemo(
-    () => (updater: (current: StudyData) => StudyData) => setData((current) => (current ? updater(current) : current)),
-    [],
+    const refreshFromCloud = async () => {
+      try {
+        const cloudData = await loadCloudStudyData(session.user.id);
+        if (cloudData) {
+          saveStudyData(cloudData);
+          setData(cloudData);
+          setSynced(true);
+        }
+      } catch {
+        setSynced(false);
+      }
+    };
+
+    window.addEventListener("focus", refreshFromCloud);
+    return () => window.removeEventListener("focus", refreshFromCloud);
+  }, [session]);
+
+  const updateData = useCallback(
+    (updater: (current: StudyData) => StudyData) => {
+      setData((current) => {
+        if (!current) return current;
+        const updatedData = updater(current);
+        saveStudyData(updatedData);
+        if (session) {
+          setSynced(false);
+          void saveCloudStudyData(session.user.id, updatedData)
+            .then(() => setSynced(true))
+            .catch(() => setSynced(false));
+        }
+        return updatedData;
+      });
+    },
+    [session],
   );
 
   const navigate = (section: Section) => {
@@ -945,6 +1127,8 @@ export function StudyApp() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  if (initialising) return <LoadingScreen />;
+  if (!session) return <AuthScreen />;
   if (!data) return <LoadingScreen />;
 
   return (
@@ -953,6 +1137,14 @@ export function StudyApp() {
       <MobileHeader active={activeSection} onNavigate={navigate} />
       <main className="lg:pl-[252px]">
         <div className="mx-auto max-w-[1320px] px-4 py-7 sm:px-6 sm:py-9 lg:px-10 lg:py-10">
+          <SyncStatus
+            session={session}
+            synced={synced}
+            onSignOut={() => {
+              clearStudyData();
+              void supabase.auth.signOut();
+            }}
+          />
           {activeSection === "dashboard" && <DashboardView data={data} updateData={updateData} navigate={navigate} />}
           {activeSection === "tasks" && <TasksView data={data} updateData={updateData} />}
           {activeSection === "timer" && <TimerView data={data} updateData={updateData} />}
