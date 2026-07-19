@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  BookOpen,
   BookOpenCheck,
   CalendarDays,
   Check,
@@ -16,6 +17,7 @@ import {
   EyeOff,
   FilePenLine,
   Gauge,
+  GraduationCap,
   LayoutDashboard,
   ListChecks,
   LockKeyhole,
@@ -37,6 +39,7 @@ import type { Session } from "@supabase/supabase-js";
 import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 
+import { MockSimulationView, PracticeView } from "@/components/practice-views";
 import { clearStudyData, createId, loadStudyData, saveStudyData, todayKey } from "@/lib/storage";
 import { loadCloudStudyData, saveCloudStudyData, supabase } from "@/lib/supabase";
 import type {
@@ -49,12 +52,14 @@ import type {
   TopicStatus,
 } from "@/lib/types";
 
-type Section = "dashboard" | "tasks" | "timer" | "topics" | "exercises" | "errors" | "mocks";
+type Section = "dashboard" | "tasks" | "timer" | "practice" | "simulation" | "topics" | "exercises" | "errors" | "mocks";
 
 const navigation: { id: Section; label: string; shortLabel: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Visão geral", shortLabel: "Início", icon: LayoutDashboard },
   { id: "tasks", label: "Tarefas do dia", shortLabel: "Tarefas", icon: ListChecks },
   { id: "timer", label: "Temporizador", shortLabel: "Timer", icon: TimerReset },
+  { id: "practice", label: "Treino por tema", shortLabel: "Treino", icon: BookOpen },
+  { id: "simulation", label: "Simulação de exame", shortLabel: "Exame", icon: GraduationCap },
   { id: "topics", label: "Temas", shortLabel: "Temas", icon: BookOpenCheck },
   { id: "exercises", label: "Exercícios", shortLabel: "Exercícios", icon: Target },
   { id: "errors", label: "Caderno de erros", shortLabel: "Erros", icon: FilePenLine },
@@ -1273,6 +1278,8 @@ export function StudyApp() {
           {activeSection === "dashboard" && <DashboardView data={data} updateData={updateData} navigate={navigate} />}
           {activeSection === "tasks" && <TasksView data={data} updateData={updateData} />}
           {activeSection === "timer" && <TimerView data={data} updateData={updateData} />}
+          {activeSection === "practice" && <PracticeView updateData={updateData} />}
+          {activeSection === "simulation" && <MockSimulationView updateData={updateData} />}
           {activeSection === "topics" && (
             <TopicsView
               topics={data.topics}
