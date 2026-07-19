@@ -919,7 +919,7 @@ function MocksView({ data, updateData }: { data: StudyData; updateData: (updater
 }
 
 function AuthScreen() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -933,6 +933,22 @@ function AuthScreen() {
     const values = new FormData(event.currentTarget);
     const email = values.get("email")?.toString().trim() ?? "";
     const password = values.get("password")?.toString() ?? "";
+
+    if (mode === "forgot") {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+
+      if (resetError) {
+        setError(resetError.message);
+      } else {
+        setMessage("Se existir uma conta com este email, receberás uma ligação para criar uma nova palavra-passe.");
+        event.currentTarget.reset();
+      }
+
+      setBusy(false);
+      return;
+    }
 
     const result = mode === "login"
       ? await supabase.auth.signInWithPassword({ email, password })
@@ -958,10 +974,12 @@ function AuthScreen() {
         <div className="card rounded-[18px] p-6 sm:p-8">
           <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#de6b48]">Sincronização</p>
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.035em]">
-            {mode === "login" ? "Entra na tua conta" : "Cria a tua conta"}
+            {mode === "login" ? "Entra na tua conta" : mode === "signup" ? "Cria a tua conta" : "Recuperar palavra-passe"}
           </h1>
           <p className="mt-2 text-sm leading-6 text-[#68736f]">
-            Usa a mesma conta no computador e no telemóvel para manter todo o progresso sincronizado.
+            {mode === "forgot"
+              ? "Indica o teu email e enviamos uma ligação segura para definires uma nova palavra-passe."
+              : "Usa a mesma conta no computador e no telemóvel para manter todo o progresso sincronizado."}
           </p>
 
           <form onSubmit={submit} className="mt-6 space-y-4">
@@ -972,19 +990,35 @@ function AuthScreen() {
                 <input name="email" type="email" autoComplete="email" className={`${inputClass} pl-10`} required />
               </div>
             </label>
-            <label className="block">
-              <span className="label">Palavra-passe</span>
-              <div className="relative">
-                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8b9490]" size={17} />
-                <input name="password" type="password" minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} className={`${inputClass} pl-10`} required />
-              </div>
-            </label>
+            {mode !== "forgot" && (
+              <label className="block">
+                <span className="label">Palavra-passe</span>
+                <div className="relative">
+                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8b9490]" size={17} />
+                  <input name="password" type="password" minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} className={`${inputClass} pl-10`} required />
+                </div>
+              </label>
+            )}
+
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("forgot");
+                  setError("");
+                  setMessage("");
+                }}
+                className="block w-full text-right text-sm font-bold text-[#356f5b] hover:text-[#153f36]"
+              >
+                Esqueci-me da palavra-passe
+              </button>
+            )}
 
             {error && <p className="flex items-center gap-2 text-sm font-semibold text-[#b94b45]"><AlertTriangle size={16} />{error}</p>}
             {message && <p className="rounded-[10px] bg-[#e5f4ed] px-3 py-2.5 text-sm font-semibold text-[#277454]">{message}</p>}
 
             <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>
-              {busy ? "A ligar…" : mode === "login" ? "Iniciar sessão" : "Criar conta"}
+              {busy ? "A processar…" : mode === "login" ? "Iniciar sessão" : mode === "signup" ? "Criar conta" : "Enviar ligação"}
             </button>
           </form>
 
@@ -997,8 +1031,71 @@ function AuthScreen() {
             }}
             className="mt-5 w-full text-center text-sm font-bold text-[#356f5b] hover:text-[#153f36]"
           >
-            {mode === "login" ? "Ainda não tens conta? Criar conta" : "Já tens conta? Iniciar sessão"}
+            {mode === "login" ? "Ainda não tens conta? Criar conta" : mode === "signup" ? "Já tens conta? Iniciar sessão" : "Voltar ao início de sessão"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordScreen({ onComplete }: { onComplete: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [complete, setComplete] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+
+    const values = new FormData(event.currentTarget);
+    const password = values.get("password")?.toString() ?? "";
+    const confirmation = values.get("confirmation")?.toString() ?? "";
+
+    if (password !== confirmation) {
+      setError("As duas palavras-passe não são iguais.");
+      setBusy(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setComplete(true);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#f6f5ef] px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="mb-7 flex justify-center"><Brand /></div>
+        <div className="card rounded-[18px] p-6 sm:p-8">
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#de6b48]">Segurança</p>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.035em]">Criar nova palavra-passe</h1>
+          <p className="mt-2 text-sm leading-6 text-[#68736f]">Escolhe uma palavra-passe com pelo menos 6 caracteres.</p>
+
+          {complete ? (
+            <div className="mt-6">
+              <p className="rounded-[10px] bg-[#e5f4ed] px-3 py-3 text-sm font-semibold text-[#277454]">A palavra-passe foi alterada com sucesso.</p>
+              <button type="button" onClick={onComplete} className={`${primaryButton} mt-4 w-full`}>Continuar para a aplicação</button>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="mt-6 space-y-4">
+              <label className="block">
+                <span className="label">Nova palavra-passe</span>
+                <input name="password" type="password" minLength={6} autoComplete="new-password" className={inputClass} required />
+              </label>
+              <label className="block">
+                <span className="label">Repetir palavra-passe</span>
+                <input name="confirmation" type="password" minLength={6} autoComplete="new-password" className={inputClass} required />
+              </label>
+              {error && <p className="flex items-center gap-2 text-sm font-semibold text-[#b94b45]"><AlertTriangle size={16} />{error}</p>}
+              <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>{busy ? "A guardar…" : "Guardar nova palavra-passe"}</button>
+            </form>
+          )}
         </div>
       </div>
     </div>
@@ -1035,6 +1132,7 @@ export function StudyApp() {
   const [data, setData] = useState<StudyData | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [initialising, setInitialising] = useState(true);
+  const [recoveringPassword, setRecoveringPassword] = useState(false);
   const [synced, setSynced] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
 
@@ -1074,7 +1172,8 @@ export function StudyApp() {
     };
 
     void supabase.auth.getSession().then(({ data: authData }) => hydrate(authData.session));
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") setRecoveringPassword(true);
       window.setTimeout(() => void hydrate(nextSession), 0);
     });
 
@@ -1128,6 +1227,7 @@ export function StudyApp() {
   };
 
   if (initialising) return <LoadingScreen />;
+  if (recoveringPassword) return <ResetPasswordScreen onComplete={() => setRecoveringPassword(false)} />;
   if (!session) return <AuthScreen />;
   if (!data) return <LoadingScreen />;
 
@@ -1165,3 +1265,4 @@ export function StudyApp() {
     </div>
   );
 }
+
