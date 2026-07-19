@@ -21,6 +21,8 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-## Dados
+## Dados e sincronização
 
-Os dados ficam guardados apenas no `localStorage` do navegador. A interface `StudyStorage`, em `src/lib/storage.ts`, isola a persistência da interface; uma futura integração com Supabase pode implementar o mesmo contrato sem alterar os ecrãs.
+A aplicação usa Supabase para autenticação e para sincronizar o progresso entre dispositivos. Na primeira entrada, os dados existentes no `localStorage` são enviados para a conta do utilizador. O `localStorage` continua a funcionar como cópia local para uma abertura mais rápida e para proteger o progresso durante falhas temporárias de rede.
+
+Cada utilizador só pode ler e alterar a sua própria linha na tabela `study_data`, através das políticas de segurança da base de dados.
