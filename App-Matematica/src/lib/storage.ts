@@ -103,3 +103,5 @@ export const loadStudyData = (): StudyData => {
 };
 
 export const saveStudyData = (data: StudyData) => localStudyStorage.save(data);
+
+export const clearStudyData = () => window.localStorage.removeItem(STORAGE_KEY);
