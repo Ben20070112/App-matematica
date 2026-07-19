@@ -57,7 +57,8 @@ function ViewHeading({ eyebrow, title, description }: { eyebrow: string; title: 
 }
 
 function ExerciseViewer({ exercise }: { exercise: ExamExercise }) {
-  const pageUrl = `${exercise.pdfUrl}#page=${exercise.page}&zoom=page-width`;
+  const originalPageUrl = `${exercise.pdfUrl}#page=${exercise.page}&zoom=page-width`;
+  const embeddedPageUrl = `/api/exercise-pdf?topic=${encodeURIComponent(exercise.topicId)}#page=${exercise.page}&zoom=page-width`;
 
   return (
     <div className="card overflow-hidden rounded-[16px]">
@@ -70,13 +71,13 @@ function ExerciseViewer({ exercise }: { exercise: ExamExercise }) {
           <p className="mt-2 text-sm font-bold text-[#26332f]">{exercise.source}</p>
           <p className="mt-1 text-xs leading-5 text-[#7b8581]">Resolve apenas o exercício indicado; a página pode conter outros enunciados.</p>
         </div>
-        <a href={pageUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} shrink-0`}>
-          <ExternalLink size={16} />Abrir PDF
+        <a href={originalPageUrl} target="_blank" rel="noreferrer" className={`${secondaryButton} shrink-0`}>
+          <ExternalLink size={16} />Abrir original
         </a>
       </div>
       <iframe
         key={exercise.id}
-        src={pageUrl}
+        src={embeddedPageUrl}
         title={`Exercício ${exercise.exerciseNumber} — ${exercise.source}`}
         className="h-[560px] w-full bg-white sm:h-[680px]"
       />
