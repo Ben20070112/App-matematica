@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { FormEvent, ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MockSimulationView, PracticeView } from "@/components/practice-views";
 import { clearStudyData, createId, loadStudyData, saveStudyData, todayKey } from "@/lib/storage";
@@ -402,21 +402,33 @@ function TimerPanel({ onRecord, full = false }: { onRecord: (seconds: number) =>
   const [minutes, setMinutes] = useState(25);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [running, setRunning] = useState(false);
+  const deadlineRef = useRef<number | null>(null);
   const totalSeconds = minutes * 60;
   const elapsed = totalSeconds - secondsLeft;
   const progress = (elapsed / totalSeconds) * 100;
 
+  const syncWithClock = useCallback(() => {
+    if (deadlineRef.current === null) return;
+    setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+  }, []);
+
   useEffect(() => {
     if (!running) return;
-    const interval = window.setInterval(() => {
-      setSecondsLeft((current) => Math.max(0, current - 1));
-    }, 1000);
-    return () => window.clearInterval(interval);
-  }, [running]);
+    syncWithClock();
+    const interval = window.setInterval(syncWithClock, 1000);
+    window.addEventListener("focus", syncWithClock);
+    document.addEventListener("visibilitychange", syncWithClock);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", syncWithClock);
+      document.removeEventListener("visibilitychange", syncWithClock);
+    };
+  }, [running, syncWithClock]);
 
   useEffect(() => {
     if (!running || secondsLeft !== 0) return;
     const completion = window.setTimeout(() => {
+      deadlineRef.current = null;
       setRunning(false);
       onRecord(totalSeconds);
       setSecondsLeft(totalSeconds);
@@ -426,17 +438,39 @@ function TimerPanel({ onRecord, full = false }: { onRecord: (seconds: number) =>
 
   const chooseDuration = (value: number) => {
     if (running) return;
+    deadlineRef.current = null;
     setMinutes(value);
     setSecondsLeft(value * 60);
   };
 
+  const toggleTimer = () => {
+    if (running) {
+      const remaining = deadlineRef.current === null
+        ? secondsLeft
+        : Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
+      deadlineRef.current = null;
+      setSecondsLeft(remaining);
+      setRunning(false);
+      return;
+    }
+
+    deadlineRef.current = Date.now() + secondsLeft * 1000;
+    setRunning(true);
+  };
+
   const finishSession = () => {
+    const remaining = running && deadlineRef.current !== null
+      ? Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000))
+      : secondsLeft;
+    const recordedSeconds = totalSeconds - remaining;
+    deadlineRef.current = null;
     setRunning(false);
-    if (elapsed > 0) onRecord(elapsed);
+    if (recordedSeconds > 0) onRecord(recordedSeconds);
     setSecondsLeft(totalSeconds);
   };
 
   const resetTimer = () => {
+    deadlineRef.current = null;
     setRunning(false);
     setSecondsLeft(totalSeconds);
   };
@@ -479,7 +513,7 @@ function TimerPanel({ onRecord, full = false }: { onRecord: (seconds: number) =>
         </div>
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        <button type="button" onClick={() => setRunning((value) => !value)} className={`${primaryButton} min-w-32`}>
+        <button type="button" onClick={toggleTimer} className={`${primaryButton} min-w-32`}>
           {running ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
           {running ? "Pausar" : elapsed > 0 ? "Continuar" : "Iniciar"}
         </button>
