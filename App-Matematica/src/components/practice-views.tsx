@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildMixedExam,
@@ -156,22 +156,39 @@ export function PracticeView({ updateData }: { updateData: UpdateData }) {
   const [duration, setDuration] = useState(45);
   const [phase, setPhase] = useState<SessionPhase>("setup");
   const [secondsLeft, setSecondsLeft] = useState(45 * 60);
+  const deadlineRef = useRef<number | null>(null);
   const [queue, setQueue] = useState<ExamExercise[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState({ correct: 0, wrong: 0, skipped: 0 });
   const topic = exerciseTopics.find((item) => item.id === topicId) ?? exerciseTopics[0];
   const currentExercise = queue[currentIndex];
 
+  const syncPracticeWithClock = useCallback(() => {
+    if (deadlineRef.current === null) return;
+    setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+  }, []);
+
   useEffect(() => {
     if (phase !== "running") return;
-    const interval = window.setInterval(() => setSecondsLeft((value) => Math.max(0, value - 1)), 1000);
-    return () => window.clearInterval(interval);
-  }, [phase]);
+    syncPracticeWithClock();
+    const interval = window.setInterval(syncPracticeWithClock, 1000);
+    window.addEventListener("focus", syncPracticeWithClock);
+    document.addEventListener("visibilitychange", syncPracticeWithClock);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", syncPracticeWithClock);
+      document.removeEventListener("visibilitychange", syncPracticeWithClock);
+    };
+  }, [phase, syncPracticeWithClock]);
 
   const finishPractice = useCallback(() => {
     if (phase !== "running" && phase !== "paused") return;
-    const elapsed = duration * 60 - secondsLeft;
+    const remaining = phase === "running" && deadlineRef.current !== null
+      ? Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000))
+      : secondsLeft;
+    const elapsed = duration * 60 - remaining;
     const attempted = results.correct + results.wrong;
+    deadlineRef.current = null;
 
     if (elapsed > 0 || attempted > 0) {
       updateData((current) => ({
@@ -205,6 +222,22 @@ export function PracticeView({ updateData }: { updateData: UpdateData }) {
     setCurrentIndex(0);
     setResults({ correct: 0, wrong: 0, skipped: 0 });
     setSecondsLeft(duration * 60);
+    deadlineRef.current = Date.now() + duration * 60 * 1000;
+    setPhase("running");
+  };
+
+  const togglePracticePause = () => {
+    if (phase === "running") {
+      const remaining = deadlineRef.current === null
+        ? secondsLeft
+        : Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
+      deadlineRef.current = null;
+      setSecondsLeft(remaining);
+      setPhase("paused");
+      return;
+    }
+
+    deadlineRef.current = Date.now() + secondsLeft * 1000;
     setPhase("running");
   };
 
@@ -219,6 +252,7 @@ export function PracticeView({ updateData }: { updateData: UpdateData }) {
   };
 
   const reset = () => {
+    deadlineRef.current = null;
     setPhase("setup");
     setSecondsLeft(duration * 60);
     setQueue([]);
@@ -301,7 +335,7 @@ export function PracticeView({ updateData }: { updateData: UpdateData }) {
               <SessionTimer secondsLeft={secondsLeft} phase={phase} />
               <button
                 type="button"
-                onClick={() => setPhase((current) => current === "running" ? "paused" : "running")}
+                onClick={togglePracticePause}
                 className={secondaryButton}
               >
                 {phase === "running" ? <Pause size={17} /> : <Play size={17} />}
@@ -318,7 +352,7 @@ export function PracticeView({ updateData }: { updateData: UpdateData }) {
               <Pause size={34} className="text-[#c07d2e]" />
               <h2 className="mt-4 font-display text-2xl font-semibold">Sessão em pausa</h2>
               <p className="mt-2 text-sm text-[#7a8480]">O enunciado fica escondido até retomares o treino.</p>
-              <button type="button" onClick={() => setPhase("running")} className={`${primaryButton} mt-6`}><Play size={17} />Continuar</button>
+              <button type="button" onClick={togglePracticePause} className={`${primaryButton} mt-6`}><Play size={17} />Continuar</button>
             </div>
           ) : (
             <>
@@ -357,6 +391,7 @@ type ExamMark = "correct" | "wrong" | null;
 export function MockSimulationView({ updateData }: { updateData: UpdateData }) {
   const [phase, setPhase] = useState<SessionPhase>("setup");
   const [secondsLeft, setSecondsLeft] = useState(120 * 60);
+  const deadlineRef = useRef<number | null>(null);
   const [questions, setQuestions] = useState<ExamExercise[]>([]);
   const [marks, setMarks] = useState<ExamMark[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -366,16 +401,32 @@ export function MockSimulationView({ updateData }: { updateData: UpdateData }) {
   const currentExercise = questions[currentIndex];
   const topicCount = useMemo(() => new Set(questions.map((question) => question.topicId)).size, [questions]);
 
+  const syncExamWithClock = useCallback(() => {
+    if (deadlineRef.current === null) return;
+    setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+  }, []);
+
   useEffect(() => {
     if (phase !== "running") return;
-    const interval = window.setInterval(() => setSecondsLeft((value) => Math.max(0, value - 1)), 1000);
-    return () => window.clearInterval(interval);
-  }, [phase]);
+    syncExamWithClock();
+    const interval = window.setInterval(syncExamWithClock, 1000);
+    window.addEventListener("focus", syncExamWithClock);
+    document.addEventListener("visibilitychange", syncExamWithClock);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", syncExamWithClock);
+      document.removeEventListener("visibilitychange", syncExamWithClock);
+    };
+  }, [phase, syncExamWithClock]);
 
   const finishExam = useCallback(() => {
     if (phase !== "running" && phase !== "paused") return;
-    const elapsed = 120 * 60 - secondsLeft;
+    const remaining = phase === "running" && deadlineRef.current !== null
+      ? Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000))
+      : secondsLeft;
+    const elapsed = 120 * 60 - remaining;
     const score = questions.length ? Number(((correct / questions.length) * 20).toFixed(1)) : 0;
+    deadlineRef.current = null;
 
     updateData((current) => ({
       ...current,
@@ -401,6 +452,22 @@ export function MockSimulationView({ updateData }: { updateData: UpdateData }) {
     setMarks(Array.from({ length: nextQuestions.length }, () => null));
     setCurrentIndex(0);
     setSecondsLeft(120 * 60);
+    deadlineRef.current = Date.now() + 120 * 60 * 1000;
+    setPhase("running");
+  };
+
+  const toggleExamPause = () => {
+    if (phase === "running") {
+      const remaining = deadlineRef.current === null
+        ? secondsLeft
+        : Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
+      deadlineRef.current = null;
+      setSecondsLeft(remaining);
+      setPhase("paused");
+      return;
+    }
+
+    deadlineRef.current = Date.now() + secondsLeft * 1000;
     setPhase("running");
   };
 
@@ -410,6 +477,7 @@ export function MockSimulationView({ updateData }: { updateData: UpdateData }) {
   };
 
   const reset = () => {
+    deadlineRef.current = null;
     setPhase("setup");
     setSecondsLeft(120 * 60);
     setQuestions([]);
@@ -459,7 +527,7 @@ export function MockSimulationView({ updateData }: { updateData: UpdateData }) {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <SessionTimer secondsLeft={secondsLeft} phase={phase} />
-                <button type="button" onClick={() => setPhase((current) => current === "running" ? "paused" : "running")} className={secondaryButton}>
+                <button type="button" onClick={toggleExamPause} className={secondaryButton}>
                   {phase === "running" ? <Pause size={17} /> : <Play size={17} />}
                   {phase === "running" ? "Pausar" : "Continuar"}
                 </button>
@@ -494,7 +562,7 @@ export function MockSimulationView({ updateData }: { updateData: UpdateData }) {
               <Pause size={34} className="text-[#c07d2e]" />
               <h2 className="mt-4 font-display text-2xl font-semibold">Exame em pausa</h2>
               <p className="mt-2 text-sm text-[#7a8480]">O enunciado fica escondido enquanto o cronómetro está parado.</p>
-              <button type="button" onClick={() => setPhase("running")} className={`${primaryButton} mt-6`}><Play size={17} />Continuar exame</button>
+              <button type="button" onClick={toggleExamPause} className={`${primaryButton} mt-6`}><Play size={17} />Continuar exame</button>
             </div>
           ) : (
             <>
