@@ -1191,12 +1191,14 @@ export function StudyApp() {
   const [recoveringPassword, setRecoveringPassword] = useState(false);
   const [synced, setSynced] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
+  const sessionUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
 
     const hydrate = async (nextSession: Session | null) => {
       if (!active) return;
+      sessionUserIdRef.current = nextSession?.user.id ?? null;
       setSession(nextSession);
 
       if (!nextSession) {
@@ -1230,6 +1232,14 @@ export function StudyApp() {
     void supabase.auth.getSession().then(({ data: authData }) => hydrate(authData.session));
     const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === "PASSWORD_RECOVERY") setRecoveringPassword(true);
+
+      const nextUserId = nextSession?.user.id ?? null;
+      if (event === "INITIAL_SESSION") return;
+      if (nextUserId && nextUserId === sessionUserIdRef.current) {
+        setSession(nextSession);
+        return;
+      }
+
       window.setTimeout(() => void hydrate(nextSession), 0);
     });
 
